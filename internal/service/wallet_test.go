@@ -6,9 +6,10 @@ import (
 	"wallet-service/internal/domain"
 	"wallet-service/internal/repository"
 	mock_repository "wallet-service/internal/repository/mocks"
-	"wallet-service/pkg/test_util"
+	"wallet-service/pkg/testdb"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -25,6 +26,11 @@ func TestDeposit_SuccessfulDeposit_Succeeds(t *testing.T) {
 
 	var value int64 = 100
 
+	mockTx := mock_repository.NewMockWalletTx(ctrl)
+	mockTx.EXPECT().Commit(gomock.Any()).Return(nil).Times(1)
+	mockTx.EXPECT().Rollback(gomock.Any()).AnyTimes()
+
+	repo.EXPECT().WithTx(gomock.Any()).Return(t.Context(), mockTx, nil)
 	repo.EXPECT().GetForUpdate(t.Context(), wallet.ID()).Return(wallet, nil)
 	repo.EXPECT().Update(t.Context(), wallet).Return(wallet, nil)
 
@@ -44,6 +50,10 @@ func TestDeposit_GetForUpdateReturnsError_ReturnsError(t *testing.T) {
 	walletID := uuid.New()
 	expectedErr := errors.New("get for update error")
 
+	mockTx := mock_repository.NewMockWalletTx(ctrl)
+	mockTx.EXPECT().Rollback(gomock.Any()).Times(1)
+
+	repo.EXPECT().WithTx(gomock.Any()).Return(t.Context(), mockTx, nil)
 	repo.EXPECT().GetForUpdate(t.Context(), walletID).Return(nil, expectedErr)
 	repo.EXPECT().Update(gomock.Any(), gomock.Any()).Times(0)
 
@@ -66,6 +76,10 @@ func TestDeposit_UpdateReturnsError_ReturnsError(t *testing.T) {
 
 	var value int64 = 100
 
+	mockTx := mock_repository.NewMockWalletTx(ctrl)
+	mockTx.EXPECT().Rollback(gomock.Any()).Times(1)
+
+	repo.EXPECT().WithTx(gomock.Any()).Return(t.Context(), mockTx, nil)
 	repo.EXPECT().GetForUpdate(t.Context(), wallet.ID()).Return(wallet, nil)
 	repo.EXPECT().Update(t.Context(), wallet).Return(nil, updateErr)
 
@@ -86,6 +100,11 @@ func TestWithdraw_SuccessfulWithdrawal_Succeeds(t *testing.T) {
 	repo := mock_repository.NewMockWallet(ctrl)
 	srv := NewWalletService(repo)
 
+	mockTx := mock_repository.NewMockWalletTx(ctrl)
+	mockTx.EXPECT().Commit(gomock.Any()).Return(nil).Times(1)
+	mockTx.EXPECT().Rollback(gomock.Any()).AnyTimes()
+
+	repo.EXPECT().WithTx(gomock.Any()).Return(t.Context(), mockTx, nil)
 	repo.EXPECT().GetForUpdate(t.Context(), wallet.ID()).Return(wallet, nil)
 	repo.EXPECT().Update(t.Context(), wallet).Return(wallet, nil)
 
@@ -107,7 +126,12 @@ func TestWithdraw_InsufficientFundsError_ReturnsError(t *testing.T) {
 	repo := mock_repository.NewMockWallet(ctrl)
 	srv := NewWalletService(repo)
 
+	mockTx := mock_repository.NewMockWalletTx(ctrl)
+	mockTx.EXPECT().Rollback(gomock.Any()).Times(1)
+
+	repo.EXPECT().WithTx(gomock.Any()).Return(t.Context(), mockTx, nil)
 	repo.EXPECT().GetForUpdate(t.Context(), wallet.ID()).Return(wallet, nil)
+	repo.EXPECT().Update(gomock.Any(), gomock.Any()).Times(0)
 
 	finalWallet, err := srv.Withdraw(t.Context(), wallet.ID(), withdrawAmount)
 	assert.ErrorIs(t, err, domain.ErrInsufficientBalance)
@@ -116,10 +140,15 @@ func TestWithdraw_InsufficientFundsError_ReturnsError(t *testing.T) {
 
 func TestConcurrency_TwoParallelWithdrawSecondGetsInsufficientFundsError_ReturnsError(t *testing.T) {
 	t.Parallel()
-	test_util.WithDB(t, func(r *repository.Repository) {
-		srv := NewWalletService(r.Wallet)
+	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+		repo, err := repository.NewPostgresRepository(pool)
+		if err != nil {
+			t.Fatalf("error inititalization repository: %v", err)
+		}
 
-		id, err := uuid.Parse(test_util.WalletCorrectID)
+		srv := NewWalletService(repo.Wallet)
+
+		id, err := uuid.Parse(testdb.WalletCorrectID)
 		assert.NoError(t, err)
 
 		var amount int64 = 100
@@ -146,7 +175,7 @@ func TestConcurrency_TwoParallelWithdrawSecondGetsInsufficientFundsError_Returns
 		assert.True(t, isInsufficient, "one withdraw should fail with insufficient funds")
 		assert.True(t, isSuccess, "one withdraw should succeed")
 
-		w, err := r.Get(t.Context(), id)
+		w, err := repo.Get(t.Context(), id)
 		assert.NoError(t, err)
 		assert.Equal(t, int64(0), w.Balance())
 	})
@@ -154,10 +183,15 @@ func TestConcurrency_TwoParallelWithdrawSecondGetsInsufficientFundsError_Returns
 
 func TestConcurrency_TwoParallelDepositBothSucceed_Succeed(t *testing.T) {
 	t.Parallel()
-	test_util.WithDB(t, func(r *repository.Repository) {
-		srv := NewWalletService(r.Wallet)
+	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+		repo, err := repository.NewPostgresRepository(pool)
+		if err != nil {
+			t.Fatalf("error inititalization repository: %v", err)
+		}
 
-		id, err := uuid.Parse(test_util.WalletEmptyWalletID)
+		srv := NewWalletService(repo.Wallet)
+
+		id, err := uuid.Parse(testdb.WalletEmptyWalletID)
 		assert.NoError(t, err)
 
 		var amount int64 = 50
@@ -181,7 +215,7 @@ func TestConcurrency_TwoParallelDepositBothSucceed_Succeed(t *testing.T) {
 		close(done)
 		assert.Equal(t, 2, successes, "both deposits should succeed")
 
-		w, err := r.Wallet.Get(t.Context(), id)
+		w, err := repo.Wallet.Get(t.Context(), id)
 		assert.NoError(t, err)
 		assert.Equal(t, int64(100), w.Balance())
 	})

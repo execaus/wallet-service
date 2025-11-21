@@ -1,10 +1,11 @@
-package test_util
+package testdb
 
 import (
 	"database/sql"
 	"fmt"
 	"testing"
-	"wallet-service/internal/repository"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3"
@@ -18,7 +19,7 @@ var (
 	WalletEmptyWalletID = "5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a13"
 )
 
-func WithDB(t *testing.T, fn func(r *repository.Repository)) {
+func WithDB(t *testing.T, fn func(pool *pgxpool.Pool)) {
 	dbName := "app"
 	dbUser := "user"
 	dbPassword := "pass"
@@ -72,10 +73,5 @@ func WithDB(t *testing.T, fn func(r *repository.Repository)) {
 		t.Fatalf("failed to ping postgres: %v", err)
 	}
 
-	repo, err := repository.NewPostgresRepository(dbConn)
-	if err != nil {
-		t.Fatalf("error inititalization repository: %v", err)
-	}
-
-	fn(repo)
+	fn(dbConn)
 }

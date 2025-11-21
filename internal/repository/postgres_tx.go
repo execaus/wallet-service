@@ -8,6 +8,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+//go:generate mockgen -source=postgres_tx.go -destination=mocks/tx.mock.go
+
+type WalletTx interface {
+	pgx.Tx
+}
+
 type TxRepository interface {
 	WithTx(ctx context.Context) (context.Context, pgx.Tx, error)
 }

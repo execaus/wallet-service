@@ -4,20 +4,25 @@ import (
 	"testing"
 	"time"
 	"wallet-service/internal/domain"
-	"wallet-service/pkg/test_util"
+	"wallet-service/pkg/testdb"
 
 	"github.com/google/uuid"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGet_ExistWallet_ReturnsWallet(t *testing.T) {
-	test_util.WithDB(t, func(r *Repository) {
+	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+		repo, err := NewPostgresRepository(pool)
+		if err != nil {
+			t.Fatalf("error inititalization repository: %v", err)
+		}
+
 		var expectBalance int64 = 100
-		id, err := uuid.Parse(test_util.WalletCorrectID)
+		id, err := uuid.Parse(testdb.WalletCorrectID)
 		assert.NoError(t, err)
 
-		model, err := r.Get(t.Context(), id)
+		model, err := repo.Get(t.Context(), id)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, model)
@@ -26,11 +31,12 @@ func TestGet_ExistWallet_ReturnsWallet(t *testing.T) {
 }
 
 func TestGet_NonExistentWallet_ReturnsNilNil(t *testing.T) {
-	test_util.WithDB(t, func(r *Repository) {
-		id, err := uuid.Parse(test_util.WalletNonExistentID)
+	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+		repo, err := NewPostgresRepository(pool)
+		id, err := uuid.Parse(testdb.WalletNonExistentID)
 		assert.NoError(t, err)
 
-		model, err := r.Get(t.Context(), id)
+		model, err := repo.Get(t.Context(), id)
 
 		assert.ErrorAs(t, err, &ErrWalletNotFound)
 		assert.Nil(t, model)
@@ -38,16 +44,17 @@ func TestGet_NonExistentWallet_ReturnsNilNil(t *testing.T) {
 }
 
 func TestUpdate_CorrectModel_ReturnsUpdatedModel(t *testing.T) {
-	test_util.WithDB(t, func(r *Repository) {
+	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+		repo, err := NewPostgresRepository(pool)
 		var value int64 = 100
-		id, err := uuid.Parse(test_util.WalletCorrectID)
+		id, err := uuid.Parse(testdb.WalletCorrectID)
 		assert.NoError(t, err)
-		model, err := r.Get(t.Context(), id)
+		model, err := repo.Get(t.Context(), id)
 		assert.NoError(t, err)
 		err = model.Deposit(value)
 		assert.NoError(t, err)
 
-		updatedModel, err := r.Update(t.Context(), model)
+		updatedModel, err := repo.Update(t.Context(), model)
 
 		assert.NoError(t, err)
 		assert.Equal(t, model.Balance(), updatedModel.Balance())
@@ -55,13 +62,14 @@ func TestUpdate_CorrectModel_ReturnsUpdatedModel(t *testing.T) {
 }
 
 func TestUpdate_NonExistentWallet_ReturnsUpdatedModel(t *testing.T) {
-	test_util.WithDB(t, func(r *Repository) {
-		id, err := uuid.Parse(test_util.WalletNonExistentID)
+	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+		repo, err := NewPostgresRepository(pool)
+		id, err := uuid.Parse(testdb.WalletNonExistentID)
 		assert.NoError(t, err)
 		model, err := domain.NewWallet(id, 0)
 		assert.NoError(t, err)
 
-		updatedModel, err := r.Update(t.Context(), model)
+		updatedModel, err := repo.Update(t.Context(), model)
 
 		assert.ErrorAs(t, err, &ErrWalletNotFound)
 		assert.Nil(t, updatedModel)
@@ -69,26 +77,27 @@ func TestUpdate_NonExistentWallet_ReturnsUpdatedModel(t *testing.T) {
 }
 
 func TestGetForUpdate_CorrectWallet_LocksRow(t *testing.T) {
-	test_util.WithDB(t, func(r *Repository) {
-		id, _ := uuid.Parse(test_util.WalletCorrectID)
+	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+		repo, err := NewPostgresRepository(pool)
+		id, _ := uuid.Parse(testdb.WalletCorrectID)
 
 		// Захват блокировки
-		ctx1, tx1, err := r.WithTx(t.Context())
+		ctx1, tx1, err := repo.WithTx(t.Context())
 		assert.NoError(t, err)
 		defer func() { _ = tx1.Rollback(ctx1) }()
 
-		_, err = r.GetForUpdate(ctx1, id)
+		_, err = repo.GetForUpdate(ctx1, id)
 		assert.NoError(t, err)
 
 		blocked := make(chan struct{})
 
 		// Попытка взять при блокировке
 		go func() {
-			ctx2, tx2, err := r.WithTx(t.Context())
+			ctx2, tx2, err := repo.WithTx(t.Context())
 			assert.NoError(t, err)
 			defer func() { _ = tx2.Rollback(ctx2) }()
 
-			_, err = r.GetForUpdate(ctx2, id)
+			_, err = repo.GetForUpdate(ctx2, id)
 			assert.NoError(t, err)
 
 			close(blocked)
@@ -114,33 +123,34 @@ func TestGetForUpdate_CorrectWallet_LocksRow(t *testing.T) {
 }
 
 func TestGetForUpdate_ConcurrentDeposits_CorrectBalance(t *testing.T) {
-	test_util.WithDB(t, func(r *Repository) {
+	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+		repo, err := NewPostgresRepository(pool)
 		var deposit1, deposit2 int64 = 50, 30
 
-		id, _ := uuid.Parse(test_util.WalletEmptyWalletID)
+		id, _ := uuid.Parse(testdb.WalletEmptyWalletID)
 
 		// Захват блокировки
-		ctx1, tx1, err := r.WithTx(t.Context())
+		ctx1, tx1, err := repo.WithTx(t.Context())
 		assert.NoError(t, err)
 		defer func() { _ = tx1.Rollback(ctx1) }()
 
-		w1, err := r.GetForUpdate(ctx1, id)
+		w1, err := repo.GetForUpdate(ctx1, id)
 		assert.NoError(t, err)
 
 		blocked := make(chan struct{})
 
 		// Попытка взять при блокировке
 		go func() {
-			ctx2, tx2, err := r.WithTx(t.Context())
+			ctx2, tx2, err := repo.WithTx(t.Context())
 			assert.NoError(t, err)
 			defer func() { _ = tx2.Rollback(ctx2) }()
 
-			w2, err := r.GetForUpdate(ctx2, id)
+			w2, err := repo.GetForUpdate(ctx2, id)
 			assert.NoError(t, err)
 
 			// Пополнение первой транзакции
 			assert.NoError(t, w2.Deposit(deposit2))
-			_, err = r.Update(ctx2, w2)
+			_, err = repo.Update(ctx2, w2)
 			assert.NoError(t, err)
 
 			// Освобождение блокировки
@@ -158,7 +168,7 @@ func TestGetForUpdate_ConcurrentDeposits_CorrectBalance(t *testing.T) {
 
 		// Пополнение первой транзакции
 		assert.NoError(t, w1.Deposit(deposit1))
-		_, err = r.Update(ctx1, w1)
+		_, err = repo.Update(ctx1, w1)
 		assert.NoError(t, err)
 
 		// Освобождение блокировки
@@ -171,7 +181,7 @@ func TestGetForUpdate_ConcurrentDeposits_CorrectBalance(t *testing.T) {
 			t.Fatal("вторая транзакция не завершилась после освобождения блокировки")
 		}
 
-		w, err := r.Wallet.Get(t.Context(), id)
+		w, err := repo.Wallet.Get(t.Context(), id)
 		assert.NoError(t, err)
 		assert.Equal(t, deposit1+deposit2, w.Balance())
 	})

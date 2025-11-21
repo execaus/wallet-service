@@ -13,35 +13,36 @@ import (
 
 const get = `-- name: Get :one
 SELECT id, balance
-FROM wallets
+FROM app.wallets
 WHERE id = $1
 `
 
-func (q *Queries) Get(ctx context.Context, id pgtype.UUID) (Wallet, error) {
+func (q *Queries) Get(ctx context.Context, id pgtype.UUID) (AppWallet, error) {
 	row := q.db.QueryRow(ctx, get, id)
-	var i Wallet
+	var i AppWallet
 	err := row.Scan(&i.ID, &i.Balance)
 	return i, err
 }
 
 const getForUpdate = `-- name: GetForUpdate :one
 SELECT id, balance
-FROM wallets
+FROM app.wallets
 WHERE id = $1
 FOR UPDATE
 `
 
-func (q *Queries) GetForUpdate(ctx context.Context, id pgtype.UUID) (Wallet, error) {
+func (q *Queries) GetForUpdate(ctx context.Context, id pgtype.UUID) (AppWallet, error) {
 	row := q.db.QueryRow(ctx, getForUpdate, id)
-	var i Wallet
+	var i AppWallet
 	err := row.Scan(&i.ID, &i.Balance)
 	return i, err
 }
 
-const update = `-- name: Update :exec
-UPDATE wallets
+const update = `-- name: Update :one
+UPDATE app.wallets
 SET balance = $2
 WHERE id = $1
+RETURNING id, balance
 `
 
 type UpdateParams struct {
@@ -49,7 +50,9 @@ type UpdateParams struct {
 	Balance int64
 }
 
-func (q *Queries) Update(ctx context.Context, arg UpdateParams) error {
-	_, err := q.db.Exec(ctx, update, arg.ID, arg.Balance)
-	return err
+func (q *Queries) Update(ctx context.Context, arg UpdateParams) (AppWallet, error) {
+	row := q.db.QueryRow(ctx, update, arg.ID, arg.Balance)
+	var i AppWallet
+	err := row.Scan(&i.ID, &i.Balance)
+	return i, err
 }

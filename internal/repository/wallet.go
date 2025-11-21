@@ -8,6 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 )
 
 var (
@@ -18,26 +20,94 @@ type WalletRepository struct {
 	TxRepositoryImpl
 }
 
-func (w *WalletRepository) Get(ctx context.Context, id uuid.UUID) (*domain.Wallet, error) {
-	//TODO implement me
-	panic("implement me")
+func (r *WalletRepository) Get(ctx context.Context, id uuid.UUID) (*domain.Wallet, error) {
+	q := r.getQueries(ctx)
+
+	row, err := q.Get(ctx, UUIDToPgUUID(id))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrWalletNotFound
+		}
+		log.Error(err)
+
+		return nil, err
+	}
+
+	wallet, err := pgWalletToDomain(&row)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	return wallet, nil
 }
 
-func (w *WalletRepository) GetForUpdate(ctx context.Context, id uuid.UUID) (*domain.Wallet, error) {
-	//TODO implement me
-	panic("implement me")
+func (r *WalletRepository) GetForUpdate(ctx context.Context, id uuid.UUID) (*domain.Wallet, error) {
+	q := r.getQueries(ctx)
+
+	row, err := q.GetForUpdate(ctx, UUIDToPgUUID(id))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrWalletNotFound
+		}
+		log.Error(err)
+		return nil, err
+	}
+
+	wallet, err := pgWalletToDomain(&row)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	return wallet, nil
 }
 
-func (w *WalletRepository) Update(ctx context.Context, wallet *domain.Wallet) (*domain.Wallet, error) {
-	//TODO implement me
-	panic("implement me")
+func (r *WalletRepository) Update(ctx context.Context, wallet *domain.Wallet) (*domain.Wallet, error) {
+	q := r.getQueries(ctx)
+
+	row, err := q.Update(ctx, db.UpdateParams{
+		ID:      UUIDToPgUUID(wallet.ID()),
+		Balance: wallet.Balance(),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrWalletNotFound
+		}
+		log.Error(err)
+		return nil, err
+	}
+
+	domainWallet, err := pgWalletToDomain(&row)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	return domainWallet, nil
 }
 
-func NewWalletRepository(conn *pgx.Conn, queries *db.Queries) *WalletRepository {
+func NewWalletRepository(pool *pgxpool.Pool, queries *db.Queries) *WalletRepository {
 	return &WalletRepository{
 		TxRepositoryImpl{
-			db: conn,
+			db: pool,
 			q:  queries,
 		},
 	}
+}
+
+func pgWalletToDomain(pgw *db.AppWallet) (*domain.Wallet, error) {
+	id, err := PgUUIDToUUID(pgw.ID)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	wallet, err := domain.NewWallet(id, pgw.Balance)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	return wallet, nil
 }

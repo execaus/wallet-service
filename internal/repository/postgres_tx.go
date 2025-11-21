@@ -5,6 +5,7 @@ import (
 	"wallet-service/internal/db"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type TxRepository interface {
@@ -13,14 +14,14 @@ type TxRepository interface {
 }
 
 type TxRepositoryImpl struct {
-	db *pgx.Conn
+	db *pgxpool.Pool
 	q  *db.Queries
 }
 type txKeyType struct{}
 
 var txKey = txKeyType{}
 
-func (r *TxRepositoryImpl) WithTx(ctx context.Context) (context.Context, *pgx.Tx, error) {
+func (r *TxRepositoryImpl) WithTx(ctx context.Context) (context.Context, pgx.Tx, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -28,7 +29,7 @@ func (r *TxRepositoryImpl) WithTx(ctx context.Context) (context.Context, *pgx.Tx
 
 	txQueries := r.q.WithTx(tx)
 
-	return context.WithValue(ctx, txKey, txQueries), &tx, nil
+	return context.WithValue(ctx, txKey, txQueries), tx, nil
 }
 
 func (r *TxRepositoryImpl) getQueries(ctx context.Context) *db.Queries {

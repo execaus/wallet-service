@@ -1,15 +1,16 @@
 -- name: Get :one
 SELECT *
-FROM wallets
+FROM app.wallets
 WHERE id = $1;
 
 -- name: GetForUpdate :one
 SELECT *
-FROM wallets
+FROM app.wallets
 WHERE id = $1
 FOR UPDATE;
 
--- name: Update :exec
-UPDATE wallets
+-- name: Update :one
+UPDATE app.wallets
 SET balance = $2
-WHERE id = $1;
+WHERE id = $1
+RETURNING *;

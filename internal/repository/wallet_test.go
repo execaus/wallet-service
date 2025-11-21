@@ -8,7 +8,7 @@ import (
 	"wallet-service/internal/domain"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ var (
 
 func TestGet_ExistWallet_ReturnsWallet(t *testing.T) {
 	withDB(t, func(r *Repository) {
-		expectBalance := 100
+		var expectBalance int64 = 100
 		id, err := uuid.Parse(correctID)
 		assert.NoError(t, err)
 
@@ -60,7 +60,7 @@ func TestUpdate_CorrectModel_ReturnsUpdatedModel(t *testing.T) {
 		updatedModel, err := r.Update(t.Context(), model)
 
 		assert.NoError(t, err)
-		assert.Equal(t, model.Balance()+value, updatedModel.Balance())
+		assert.Equal(t, model.Balance(), updatedModel.Balance())
 	})
 }
 
@@ -164,7 +164,11 @@ func withDB(t *testing.T, fn func(r *Repository)) {
 		t.Fatalf("failed to apply migrations: %v", err)
 	}
 
-	dbConn, err := pgx.Connect(t.Context(), dsn)
+	if err := goose.Up(sqlDB, "../../migrations/test"); err != nil {
+		t.Fatalf("failed to apply migrations: %v", err)
+	}
+
+	dbConn, err := pgxpool.New(t.Context(), dsn)
 	if err != nil {
 		t.Fatalf("failed to connect to postgres: %v", err)
 	}

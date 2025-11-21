@@ -19,6 +19,7 @@ import (
 var (
 	correctID     = "3f9a1b9e-2f64-4f42-9b4d-2d1c9a5ef901"
 	nonExistentID = "3f9a1b9e-2f64-4f42-9b4d-2d1c9a5ef900"
+	emptyWalletID = "5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a13"
 )
 
 func TestGet_ExistWallet_ReturnsWallet(t *testing.T) {
@@ -107,7 +108,7 @@ func TestGetForUpdate_CorrectWallet_LocksRow(t *testing.T) {
 		// Убеждаемся, что вторая транзакция заблокирована
 		select {
 		case <-blocked:
-			t.Fatal("second tx must be blocked but it acquired lock immediately")
+			t.Fatal("вторая транзакция должна быть заблокирована, но она сразу получила блокировку")
 		case <-time.After(time.Second):
 		}
 
@@ -118,8 +119,72 @@ func TestGetForUpdate_CorrectWallet_LocksRow(t *testing.T) {
 		select {
 		case <-blocked:
 		case <-time.After(time.Second):
-			t.Fatal("second tx did not complete after lock release")
+			t.Fatal("вторая транзакция не завершилась после освобождения блокировки")
 		}
+	})
+}
+
+func TestGetForUpdate_ConcurrentDeposits_CorrectBalance(t *testing.T) {
+	withDB(t, func(r *Repository) {
+		var deposit1, deposit2 int64 = 50, 30
+
+		id, _ := uuid.Parse(emptyWalletID)
+
+		// Захват блокировки
+		ctx1, tx1, err := r.WithTx(t.Context())
+		assert.NoError(t, err)
+		defer func() { _ = tx1.Rollback(ctx1) }()
+
+		w1, err := r.GetForUpdate(ctx1, id)
+		assert.NoError(t, err)
+
+		blocked := make(chan struct{})
+
+		// Попытка взять при блокировке
+		go func() {
+			ctx2, tx2, err := r.WithTx(t.Context())
+			assert.NoError(t, err)
+			defer func() { _ = tx2.Rollback(ctx2) }()
+
+			w2, err := r.GetForUpdate(ctx2, id)
+			assert.NoError(t, err)
+
+			// Пополнение первой транзакции
+			assert.NoError(t, w2.Deposit(deposit2))
+			_, err = r.Update(ctx2, w2)
+			assert.NoError(t, err)
+
+			// Освобождение блокировки
+			assert.NoError(t, tx2.Commit(ctx2))
+
+			close(blocked)
+		}()
+
+		// Убеждаемся, что вторая транзакция заблокирована
+		select {
+		case <-blocked:
+			t.Fatal("вторая транзакция должна быть заблокирована, но она сразу получила блокировку")
+		case <-time.After(time.Second):
+		}
+
+		// Пополнение первой транзакции
+		assert.NoError(t, w1.Deposit(deposit1))
+		_, err = r.Update(ctx1, w1)
+		assert.NoError(t, err)
+
+		// Освобождение блокировки
+		assert.NoError(t, tx1.Commit(ctx1))
+
+		// Теперь вторая транзакция должна выполниться
+		select {
+		case <-blocked:
+		case <-time.After(time.Second):
+			t.Fatal("вторая транзакция не завершилась после освобождения блокировки")
+		}
+
+		w, err := r.Wallet.Get(t.Context(), id)
+		assert.NoError(t, err)
+		assert.Equal(t, deposit1+deposit2, w.Balance())
 	})
 }
 

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"math"
 
 	"github.com/google/uuid"
 )
@@ -19,6 +20,9 @@ var (
 )
 
 func NewWallet(id uuid.UUID, balance int64) (*Wallet, error) {
+	if balance < 0 {
+		return nil, ErrNegativeAmount
+	}
 	return &Wallet{
 		id:      id,
 		balance: balance,
@@ -34,9 +38,33 @@ func (w *Wallet) Balance() int64 {
 }
 
 func (w *Wallet) Deposit(amount int64) error {
-	// TODO
+	if amount == 0 {
+		return ErrZeroAmount
+	}
+	if amount < 0 {
+		return ErrNegativeAmount
+	}
+	if w.balance > (math.MaxInt64 - amount) {
+		return ErrOverflow
+	}
+
+	w.balance += amount
+
+	return nil
 }
 
 func (w *Wallet) Withdraw(amount int64) error {
-	// TODO
+	if amount == 0 {
+		return ErrZeroAmount
+	}
+	if amount < 0 {
+		return ErrNegativeAmount
+	}
+	if w.balance < amount {
+		return ErrInsufficientBalance
+	}
+
+	w.balance -= amount
+
+	return nil
 }

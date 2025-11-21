@@ -8,7 +8,7 @@ import (
 )
 
 type TxRepository interface {
-	WithTx(ctx context.Context) (context.Context, *pgx.Tx, error)
+	WithTx(ctx context.Context) (context.Context, pgx.Tx, error)
 	getQueries(ctx context.Context) *db.Queries
 }
 

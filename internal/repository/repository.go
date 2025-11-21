@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
+//go:generate mockgen -source=repository.go -destination=mocks/mock.go
+
 type Wallet interface {
 	TxRepository
 	Get(ctx context.Context, id uuid.UUID) (*domain.Wallet, error)

@@ -32,3 +32,6 @@ vendor/
 
 # Environment files
 *.env
+
+# Mocks
+**/mocks

@@ -1,31 +1,20 @@
 package repository
 
 import (
-	"database/sql"
-	"fmt"
 	"testing"
 	"time"
 	"wallet-service/internal/domain"
+	"wallet-service/pkg/test_util"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
-)
-
-var (
-	correctID     = "3f9a1b9e-2f64-4f42-9b4d-2d1c9a5ef901"
-	nonExistentID = "3f9a1b9e-2f64-4f42-9b4d-2d1c9a5ef900"
-	emptyWalletID = "5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a13"
 )
 
 func TestGet_ExistWallet_ReturnsWallet(t *testing.T) {
-	withDB(t, func(r *Repository) {
+	test_util.WithDB(t, func(r *Repository) {
 		var expectBalance int64 = 100
-		id, err := uuid.Parse(correctID)
+		id, err := uuid.Parse(test_util.WalletCorrectID)
 		assert.NoError(t, err)
 
 		model, err := r.Get(t.Context(), id)
@@ -37,8 +26,8 @@ func TestGet_ExistWallet_ReturnsWallet(t *testing.T) {
 }
 
 func TestGet_NonExistentWallet_ReturnsNilNil(t *testing.T) {
-	withDB(t, func(r *Repository) {
-		id, err := uuid.Parse(nonExistentID)
+	test_util.WithDB(t, func(r *Repository) {
+		id, err := uuid.Parse(test_util.WalletNonExistentID)
 		assert.NoError(t, err)
 
 		model, err := r.Get(t.Context(), id)
@@ -49,9 +38,9 @@ func TestGet_NonExistentWallet_ReturnsNilNil(t *testing.T) {
 }
 
 func TestUpdate_CorrectModel_ReturnsUpdatedModel(t *testing.T) {
-	withDB(t, func(r *Repository) {
+	test_util.WithDB(t, func(r *Repository) {
 		var value int64 = 100
-		id, err := uuid.Parse(correctID)
+		id, err := uuid.Parse(test_util.WalletCorrectID)
 		assert.NoError(t, err)
 		model, err := r.Get(t.Context(), id)
 		assert.NoError(t, err)
@@ -66,8 +55,8 @@ func TestUpdate_CorrectModel_ReturnsUpdatedModel(t *testing.T) {
 }
 
 func TestUpdate_NonExistentWallet_ReturnsUpdatedModel(t *testing.T) {
-	withDB(t, func(r *Repository) {
-		id, err := uuid.Parse(nonExistentID)
+	test_util.WithDB(t, func(r *Repository) {
+		id, err := uuid.Parse(test_util.WalletNonExistentID)
 		assert.NoError(t, err)
 		model, err := domain.NewWallet(id, 0)
 		assert.NoError(t, err)
@@ -80,8 +69,8 @@ func TestUpdate_NonExistentWallet_ReturnsUpdatedModel(t *testing.T) {
 }
 
 func TestGetForUpdate_CorrectWallet_LocksRow(t *testing.T) {
-	withDB(t, func(r *Repository) {
-		id, _ := uuid.Parse(correctID)
+	test_util.WithDB(t, func(r *Repository) {
+		id, _ := uuid.Parse(test_util.WalletCorrectID)
 
 		// Захват блокировки
 		ctx1, tx1, err := r.WithTx(t.Context())
@@ -125,10 +114,10 @@ func TestGetForUpdate_CorrectWallet_LocksRow(t *testing.T) {
 }
 
 func TestGetForUpdate_ConcurrentDeposits_CorrectBalance(t *testing.T) {
-	withDB(t, func(r *Repository) {
+	test_util.WithDB(t, func(r *Repository) {
 		var deposit1, deposit2 int64 = 50, 30
 
-		id, _ := uuid.Parse(emptyWalletID)
+		id, _ := uuid.Parse(test_util.WalletEmptyWalletID)
 
 		// Захват блокировки
 		ctx1, tx1, err := r.WithTx(t.Context())
@@ -186,66 +175,4 @@ func TestGetForUpdate_ConcurrentDeposits_CorrectBalance(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, deposit1+deposit2, w.Balance())
 	})
-}
-
-func withDB(t *testing.T, fn func(r *Repository)) {
-	dbName := "app"
-	dbUser := "user"
-	dbPassword := "pass"
-
-	postgresContainer, err := postgres.Run(t.Context(),
-		"postgres:17",
-		postgres.WithDatabase(dbName),
-		postgres.WithUsername(dbUser),
-		postgres.WithPassword(dbPassword),
-		postgres.BasicWaitStrategies(),
-		postgres.WithSQLDriver("pgx"),
-	)
-	defer func() {
-		if err = testcontainers.TerminateContainer(postgresContainer); err != nil {
-			t.Fatalf("failed to terminate container: %s", err)
-		}
-	}()
-	if err != nil {
-		t.Fatalf("failed to start container: %s", err)
-	}
-
-	host, _ := postgresContainer.Host(t.Context())
-	port, _ := postgresContainer.MappedPort(t.Context(), "5432")
-
-	dsn := fmt.Sprintf("postgres://user:pass@%s:%s/app?sslmode=disable", host, port.Port())
-
-	sqlDB, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	defer func() {
-		if err := sqlDB.Close(); err != nil {
-			t.Fatalf("failed to close sqlDB: %v", err)
-		}
-	}()
-
-	if err := goose.Up(sqlDB, "../../migrations"); err != nil {
-		t.Fatalf("failed to apply migrations: %v", err)
-	}
-
-	if err := goose.Up(sqlDB, "../../migrations/test"); err != nil {
-		t.Fatalf("failed to apply migrations: %v", err)
-	}
-
-	dbConn, err := pgxpool.New(t.Context(), dsn)
-	if err != nil {
-		t.Fatalf("failed to connect to postgres: %v", err)
-	}
-
-	if err = dbConn.Ping(t.Context()); err != nil {
-		t.Fatalf("failed to ping postgres: %v", err)
-	}
-
-	repo, err := NewPostgresRepository(dbConn)
-	if err != nil {
-		t.Fatalf("error inititalization repository: %v", err)
-	}
-
-	fn(repo)
 }

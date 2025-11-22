@@ -12,10 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 )
 
-var (
-	ErrWalletNotFound = errors.New("wallet not found")
-)
-
 type WalletRepository struct {
 	TxRepositoryImpl
 }
@@ -26,7 +22,7 @@ func (r *WalletRepository) Get(ctx context.Context, id uuid.UUID) (*domain.Walle
 	row, err := q.Get(ctx, UUIDToPgUUID(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrWalletNotFound
+			return nil, domain.ErrWalletNotFound
 		}
 		log.Error(err)
 
@@ -48,7 +44,7 @@ func (r *WalletRepository) GetForUpdate(ctx context.Context, id uuid.UUID) (*dom
 	row, err := q.GetForUpdate(ctx, UUIDToPgUUID(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrWalletNotFound
+			return nil, domain.ErrWalletNotFound
 		}
 		log.Error(err)
 		return nil, err
@@ -72,7 +68,7 @@ func (r *WalletRepository) Update(ctx context.Context, wallet *domain.Wallet) (*
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrWalletNotFound
+			return nil, domain.ErrWalletNotFound
 		}
 		log.Error(err)
 		return nil, err

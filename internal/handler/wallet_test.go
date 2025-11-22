@@ -41,7 +41,7 @@ func TestUpdateWallet_CorrectDeposit_200(t *testing.T) {
 	mockWallet.
 		EXPECT().
 		Deposit(gomock.Any(), id, amount).
-		Return(&wallet, nil)
+		Return(wallet, nil)
 
 	srv := service.Service{
 		Wallet: mockWallet,
@@ -50,7 +50,7 @@ func TestUpdateWallet_CorrectDeposit_200(t *testing.T) {
 	router := setupRouter(h)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/wallet", getBodyReader(t, map[string]interface{}{
-		"walletId":      uuid.New().String(),
+		"walletId":      id.String(),
 		"operationType": "DEPOSIT",
 		"amount":        amount,
 	}))
@@ -75,7 +75,7 @@ func TestUpdateWallet_CorrectWithdraw_200(t *testing.T) {
 	mockWallet.
 		EXPECT().
 		Withdraw(gomock.Any(), id, amount).
-		Return(&wallet, nil)
+		Return(wallet, nil)
 
 	srv := service.Service{
 		Wallet: mockWallet,
@@ -84,7 +84,7 @@ func TestUpdateWallet_CorrectWithdraw_200(t *testing.T) {
 	router := setupRouter(h)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/wallet", getBodyReader(t, map[string]interface{}{
-		"walletId":      uuid.New().String(),
+		"walletId":      id.String(),
 		"operationType": "WITHDRAW",
 		"amount":        amount,
 	}))
@@ -216,7 +216,7 @@ func TestUpdateWallet_ServiceError_500(t *testing.T) {
 	router := setupRouter(h)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/wallet", getBodyReader(t, map[string]interface{}{
-		"walletId":      uuid.New().String(),
+		"walletId":      id.String(),
 		"operationType": "DEPOSIT",
 		"amount":        amount,
 	}))
@@ -239,7 +239,7 @@ func TestUpdateWallet_NonExistentWallet_404(t *testing.T) {
 	mockWallet.
 		EXPECT().
 		Deposit(gomock.Any(), id, amount).
-		Return(nil, nil)
+		Return(nil, domain.ErrWalletNotFound)
 
 	srv := service.Service{
 		Wallet: mockWallet,
@@ -248,7 +248,7 @@ func TestUpdateWallet_NonExistentWallet_404(t *testing.T) {
 	router := setupRouter(h)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/wallet", getBodyReader(t, map[string]interface{}{
-		"walletId":      uuid.New().String(),
+		"walletId":      id.String(),
 		"operationType": "DEPOSIT",
 		"amount":        amount,
 	}))
@@ -260,7 +260,7 @@ func TestUpdateWallet_NonExistentWallet_404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
-func TestUpdateWallet_AmountExceedsBalance_404(t *testing.T) {
+func TestUpdateWallet_AmountExceedsBalance_409(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -271,7 +271,7 @@ func TestUpdateWallet_AmountExceedsBalance_404(t *testing.T) {
 	mockWallet.
 		EXPECT().
 		Deposit(gomock.Any(), id, amount).
-		Return(nil, &domain.ErrInsufficientBalance)
+		Return(nil, domain.ErrInsufficientBalance)
 
 	srv := service.Service{
 		Wallet: mockWallet,
@@ -280,7 +280,7 @@ func TestUpdateWallet_AmountExceedsBalance_404(t *testing.T) {
 	router := setupRouter(h)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/wallet", getBodyReader(t, map[string]interface{}{
-		"walletId":      uuid.New().String(),
+		"walletId":      id.String(),
 		"operationType": "DEPOSIT",
 		"amount":        amount,
 	}))
@@ -304,7 +304,7 @@ func TestGetWallet_CorrectID_200(t *testing.T) {
 	mockWallet.
 		EXPECT().
 		Get(gomock.Any(), id).
-		Return(&wallet, nil)
+		Return(wallet, nil)
 
 	srv := service.Service{
 		Wallet: mockWallet,
@@ -339,7 +339,7 @@ func TestGetWallet_InvalidUUID_400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestGetWallet_NotFound_404(t *testing.T) {
+func TestGetWallet_NonExistentWallet_404(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -349,7 +349,7 @@ func TestGetWallet_NotFound_404(t *testing.T) {
 	mockWallet.
 		EXPECT().
 		Get(gomock.Any(), id).
-		Return(nil, nil)
+		Return(nil, domain.ErrWalletNotFound)
 
 	srv := service.Service{
 		Wallet: mockWallet,

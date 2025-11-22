@@ -134,7 +134,7 @@ func TestWithdraw_InsufficientFundsError_ReturnsError(t *testing.T) {
 	repo.EXPECT().Update(gomock.Any(), gomock.Any()).Times(0)
 
 	finalWallet, err := srv.Withdraw(t.Context(), wallet.ID(), withdrawAmount)
-	assert.ErrorIs(t, err, domain.ErrInsufficientBalance)
+	assert.ErrorIs(t, err, wallet.ErrInsufficientBalance)
 	assert.Nil(t, finalWallet)
 }
 

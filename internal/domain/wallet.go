@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"math"
 
 	"github.com/google/uuid"
@@ -11,13 +10,6 @@ type Wallet struct {
 	id      uuid.UUID
 	balance int64
 }
-
-var (
-	ErrNegativeAmount      = errors.New("amount cannot be negative")
-	ErrZeroAmount          = errors.New("amount cannot be zero")
-	ErrInsufficientBalance = errors.New("insufficient balance")
-	ErrOverflow            = errors.New("balance overflow")
-)
 
 func NewWallet(id uuid.UUID, balance int64) (*Wallet, error) {
 	if balance < 0 {

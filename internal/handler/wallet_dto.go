@@ -3,7 +3,7 @@ package handler
 type UpdateWalletRequest struct {
 	WalletID      string `json:"walletId" binding:"required"`
 	OperationType string `json:"operationType" binding:"required,oneof=DEPOSIT WITHDRAW"`
-	Amount        int64  `json:"amount" binding:"required"`
+	Amount        int64  `json:"amount" binding:"required,gte=0"`
 }
 
 type UpdateWalletResponse struct {

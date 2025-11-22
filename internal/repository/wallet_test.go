@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var migrationsPath = []string{"../../migrations", "../../migrations/test"}
+
 func TestGet_ExistWallet_ReturnsWallet(t *testing.T) {
-	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+	testdb.WithDB(t, migrationsPath, func(pool *pgxpool.Pool) {
 		repo, err := NewPostgresRepository(pool)
 		if err != nil {
 			t.Fatalf("error inititalization repository: %v", err)
@@ -31,20 +33,20 @@ func TestGet_ExistWallet_ReturnsWallet(t *testing.T) {
 }
 
 func TestGet_NonExistentWallet_ReturnsNilNil(t *testing.T) {
-	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+	testdb.WithDB(t, migrationsPath, func(pool *pgxpool.Pool) {
 		repo, err := NewPostgresRepository(pool)
 		id, err := uuid.Parse(testdb.WalletNonExistentID)
 		assert.NoError(t, err)
 
 		model, err := repo.Get(t.Context(), id)
 
-		assert.ErrorAs(t, err, &ErrWalletNotFound)
+		assert.ErrorAs(t, err, &domain.ErrWalletNotFound)
 		assert.Nil(t, model)
 	})
 }
 
 func TestUpdate_CorrectModel_ReturnsUpdatedModel(t *testing.T) {
-	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+	testdb.WithDB(t, migrationsPath, func(pool *pgxpool.Pool) {
 		repo, err := NewPostgresRepository(pool)
 		var value int64 = 100
 		id, err := uuid.Parse(testdb.WalletCorrectID)
@@ -62,7 +64,7 @@ func TestUpdate_CorrectModel_ReturnsUpdatedModel(t *testing.T) {
 }
 
 func TestUpdate_NonExistentWallet_ReturnsUpdatedModel(t *testing.T) {
-	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+	testdb.WithDB(t, migrationsPath, func(pool *pgxpool.Pool) {
 		repo, err := NewPostgresRepository(pool)
 		id, err := uuid.Parse(testdb.WalletNonExistentID)
 		assert.NoError(t, err)
@@ -71,13 +73,13 @@ func TestUpdate_NonExistentWallet_ReturnsUpdatedModel(t *testing.T) {
 
 		updatedModel, err := repo.Update(t.Context(), model)
 
-		assert.ErrorAs(t, err, &ErrWalletNotFound)
+		assert.ErrorAs(t, err, &domain.ErrWalletNotFound)
 		assert.Nil(t, updatedModel)
 	})
 }
 
 func TestGetForUpdate_CorrectWallet_LocksRow(t *testing.T) {
-	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+	testdb.WithDB(t, migrationsPath, func(pool *pgxpool.Pool) {
 		repo, err := NewPostgresRepository(pool)
 		id, _ := uuid.Parse(testdb.WalletCorrectID)
 
@@ -123,7 +125,7 @@ func TestGetForUpdate_CorrectWallet_LocksRow(t *testing.T) {
 }
 
 func TestGetForUpdate_ConcurrentDeposits_CorrectBalance(t *testing.T) {
-	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+	testdb.WithDB(t, migrationsPath, func(pool *pgxpool.Pool) {
 		repo, err := NewPostgresRepository(pool)
 		var deposit1, deposit2 int64 = 50, 30
 

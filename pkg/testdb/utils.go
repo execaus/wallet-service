@@ -19,7 +19,7 @@ var (
 	WalletEmptyWalletID = "5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a13"
 )
 
-func WithDB(t *testing.T, fn func(pool *pgxpool.Pool)) {
+func WithDB(t *testing.T, migrationsPath []string, fn func(pool *pgxpool.Pool)) {
 	dbName := "app"
 	dbUser := "user"
 	dbPassword := "pass"
@@ -56,12 +56,10 @@ func WithDB(t *testing.T, fn func(pool *pgxpool.Pool)) {
 		}
 	}()
 
-	if err := goose.Up(sqlDB, "../../migrations"); err != nil {
-		t.Fatalf("failed to apply migrations: %v", err)
-	}
-
-	if err := goose.Up(sqlDB, "../../migrations/test"); err != nil {
-		t.Fatalf("failed to apply migrations: %v", err)
+	for _, path := range migrationsPath {
+		if err := goose.Up(sqlDB, path); err != nil {
+			t.Fatalf("failed to apply migrations: %v", err)
+		}
 	}
 
 	dbConn, err := pgxpool.New(t.Context(), dsn)

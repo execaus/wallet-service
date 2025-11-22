@@ -41,10 +41,10 @@ func (h *Handler) UpdateWallet(c *gin.Context) {
 
 		switch {
 		case errors.Is(err, domain.ErrWalletNotFound):
-			c.AbortWithStatus(http.StatusNotFound)
+			c.AbortWithStatusJSON(http.StatusNotFound, &ErrorResponse{Message: domain.ErrWalletNotFound.Error()})
 			return
 		case errors.Is(err, domain.ErrInsufficientBalance):
-			c.AbortWithStatus(http.StatusConflict)
+			c.AbortWithStatusJSON(http.StatusConflict, &ErrorResponse{Message: domain.ErrInsufficientBalance.Error()})
 			return
 		default:
 			c.AbortWithStatus(http.StatusInternalServerError)
@@ -77,7 +77,7 @@ func (h *Handler) GetWallet(c *gin.Context) {
 	if err != nil {
 		log.Error(err)
 		if errors.Is(err, domain.ErrWalletNotFound) {
-			c.AbortWithStatus(http.StatusNotFound)
+			c.AbortWithStatusJSON(http.StatusNotFound, &ErrorResponse{Message: domain.ErrWalletNotFound.Error()})
 			return
 		}
 		c.AbortWithStatus(http.StatusInternalServerError)

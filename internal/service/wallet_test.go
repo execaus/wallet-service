@@ -14,6 +14,8 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+var migrationsPath = []string{"../../migrations", "../../migrations/test"}
+
 func TestDeposit_SuccessfulDeposit_Succeeds(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -134,13 +136,13 @@ func TestWithdraw_InsufficientFundsError_ReturnsError(t *testing.T) {
 	repo.EXPECT().Update(gomock.Any(), gomock.Any()).Times(0)
 
 	finalWallet, err := srv.Withdraw(t.Context(), wallet.ID(), withdrawAmount)
-	assert.ErrorIs(t, err, wallet.ErrInsufficientBalance)
+	assert.ErrorIs(t, err, domain.ErrInsufficientBalance)
 	assert.Nil(t, finalWallet)
 }
 
 func TestConcurrency_TwoParallelWithdrawSecondGetsInsufficientFundsError_ReturnsError(t *testing.T) {
 	t.Parallel()
-	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+	testdb.WithDB(t, migrationsPath, func(pool *pgxpool.Pool) {
 		repo, err := repository.NewPostgresRepository(pool)
 		if err != nil {
 			t.Fatalf("error inititalization repository: %v", err)
@@ -183,7 +185,7 @@ func TestConcurrency_TwoParallelWithdrawSecondGetsInsufficientFundsError_Returns
 
 func TestConcurrency_TwoParallelDepositBothSucceed_Succeed(t *testing.T) {
 	t.Parallel()
-	testdb.WithDB(t, func(pool *pgxpool.Pool) {
+	testdb.WithDB(t, migrationsPath, func(pool *pgxpool.Pool) {
 		repo, err := repository.NewPostgresRepository(pool)
 		if err != nil {
 			t.Fatalf("error inititalization repository: %v", err)

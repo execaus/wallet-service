@@ -2,9 +2,16 @@ package domain
 
 import (
 	"math"
+	"sync"
 
 	"github.com/google/uuid"
 )
+
+var walletPool = sync.Pool{
+	New: func() interface{} {
+		return &Wallet{}
+	},
+}
 
 type Wallet struct {
 	id      uuid.UUID
@@ -15,10 +22,16 @@ func NewWallet(id uuid.UUID, balance int64) (*Wallet, error) {
 	if balance < 0 {
 		return nil, ErrNegativeAmount
 	}
-	return &Wallet{
-		id:      id,
-		balance: balance,
-	}, nil
+	w := walletPool.Get().(*Wallet)
+	w.id = id
+	w.balance = balance
+	return w, nil
+}
+
+func (w *Wallet) Release() {
+	w.id = uuid.Nil
+	w.balance = 0
+	walletPool.Put(w)
 }
 
 func (w *Wallet) ID() uuid.UUID {

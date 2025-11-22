@@ -56,6 +56,8 @@ func (h *Handler) UpdateWallet(c *gin.Context) {
 		WalletID:   wallet.ID().String(),
 		NewBalance: wallet.Balance(),
 	})
+
+	wallet.Release()
 }
 
 func (h *Handler) GetWallet(c *gin.Context) {
@@ -88,4 +90,6 @@ func (h *Handler) GetWallet(c *gin.Context) {
 		WalletID: wallet.ID().String(),
 		Balance:  wallet.Balance(),
 	})
+
+	wallet.Release()
 }

@@ -17,6 +17,7 @@ var (
 	WalletCorrectID     = "3f9a1b9e-2f64-4f42-9b4d-2d1c9a5ef901"
 	WalletNonExistentID = "3f9a1b9e-2f64-4f42-9b4d-2d1c9a5ef900"
 	WalletEmptyWalletID = "5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a13"
+	Wallet10000AmountID = "5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a14"
 )
 
 func WithDB(t *testing.T, migrationsPath []string, fn func(pool *pgxpool.Pool)) {

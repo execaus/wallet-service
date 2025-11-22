@@ -79,7 +79,7 @@ DATABASE_TEST=true
 2. Запустите сервис:
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 Сервис будет доступен на порту `8080`.

@@ -53,19 +53,33 @@
 
 ```env
 SERVER_PORT=8080
-DATABASE_HOST=localhost
+DATABASE_HOST=postgres
 DATABASE_PORT=5432
 DATABASE_USER=postgres
 DATABASE_PASSWORD=1234
-DATABASE_NAME=wallet
-DATABASE_TEST=false
+DATABASE_NAME=app
+DATABASE_TEST=true
 ```
 
-> Если `DATABASE_TEST` установлен в `true`, приложение может создавать тестовые кошельки с предустановленным балансом для тестирования, например:
-> 
-> ```text
-> ('3f9a1b9e-2f64-4f42-9b4d-2d1c9a5ef901', 100),
-> ('5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a12', 10),
-> ('5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a13', 0),
-> ('5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a14', 10000)
-> ```
+ Если `DATABASE_TEST` установлен в `true`, приложение может создавать тестовые кошельки с предустановленным балансом для тестирования, например:
+
+| Wallet ID | Balance |
+|-----------|--------|
+| 3f9a1b9e-2f64-4f42-9b4d-2d1c9a5ef901 | 100 |
+| 5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a12 | 10 |
+| 5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a13 | 0 |
+| 5d2c7e80-1a34-4b74-8cc2-9f0e4f3c2a14 | 10000 |
+
+## Запуск через Docker Compose
+
+Для запуска сервиса с базой данных PostgreSQL можно использовать `docker-compose`.
+
+1. Убедитесь, что файл `config.env` создан (см. выше) и содержит все необходимые переменные окружения. Вы можете скопировать базовые значения из предыдущего блока.
+
+2. Запустите сервис:
+
+```bash
+docker-compose up --build
+```
+
+Сервис будет доступен на порту `8080`.

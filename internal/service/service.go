@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
+//go:generate mockgen -source=service.go -destination=mocks/mock.go
+
 type Wallet interface {
 	Get(ctx context.Context, id uuid.UUID) (*domain.Wallet, error)
 	Deposit(ctx context.Context, id uuid.UUID, amount int64) (*domain.Wallet, error)
